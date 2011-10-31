@@ -2,8 +2,6 @@
 
 PHP Store Locator API
 
-[Live Example](http://www.galengrover.com/projects/PHPStoreLocator/example/)
-
 ##Features
  - English or metric units
  - Easily adapted to your database environment (Uses PDO and prepared statements)
