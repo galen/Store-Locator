@@ -13,8 +13,6 @@ PHP Store Locator API
 
 ##Example
 
-This example uses my [geocoder](https://github.com/galen/Geocoder). You can use any geocoder, just be sure to pass the lat/lng in the `$options` array.
-
 	$options = array(
 		'db_info'	=> array(
 			'db_username'	=> 'username',
@@ -23,8 +21,8 @@ This example uses my [geocoder](https://github.com/galen/Geocoder). You can use 
 		),
 		'locations_table'	=> 'storelocations',
 		'position'	=> array(
-			'lat'	=> $coords->lat,
-			'lng'	=> $coords->lng
+			'lat'	=> $lat,
+			'lng'	=> $lng
 		),
 		'return_columns'	=> array(
 			'name',
