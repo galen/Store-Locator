@@ -1,19 +1,19 @@
 <?php
 
 /**
- * PHP Store Locator
+ * Store Locator
  * @author Galen Grover <galenjr@gmail.com>
- * @package PHPStoreLocator
+ * @packagePStoreLocator
 */
 
 /**
- * PHP Store Locator
+ * Store Locator
  *
  * Here is the minimum implementation:
  *
  * require( 'path/to/Store-Locator/Store-Locator.php' );
  *
- * $locator = new PHPStoreLocator;
+ * $locator = new StoreLocator;
  * $locator->setDbInfo( 'username', 'password', 'database' );
  * $locator->setPosition( $lat, $lng );
  *
@@ -21,7 +21,7 @@
  * 	  $result =  $locator->getLocations();
  * }
  * catch( Exception $e ) {
- * 	  if ( $e->getCode() == PHPStoreLocator::ERROR_DB_CONNECTION ) {
+ * 	  if ( $e->getCode() == StoreLocator::ERROR_DB_CONNECTION ) {
  * 		  $error_msg = 'Error Connecting to the database';
  * 	  }
  * 	  else {
@@ -33,7 +33,7 @@
  *
  */
 
-class PHPStoreLocator {
+class StoreLocator {
 
 	/**
 	 * Miles to Kilometers conversion
@@ -94,6 +94,17 @@ class PHPStoreLocator {
 	 * @var string
 	 */
 	protected $longitude_column = 'lng';
+
+	/**
+	 * PDO object
+	 * This is set via setDb()
+	 * It is an alternative to setting the db info with setDbInfo()
+	 *
+	 * @see setDb()
+	 *
+	 * @var PDO
+	 */
+	protected $db;
 
 	/**
 	 * Databse username
@@ -254,10 +265,22 @@ class PHPStoreLocator {
 	protected $rules = array();
 
 	/**
+	 * Return class
+	 *
+	 * Class name of the returned locations
+	 * Defaults to StdClass
+	 *
+	 * @see setReturnClass()
+	 *
+	 * @var string
+	 */
+	protected $return_class;
+
+	/**
 	 * Constructor
 	 *
 	 * @param array $options array of initialization options
-	 * @return PHPStoreLocator
+	 * @return StoreLocator
 	 */
 	function __construct( array $options = null ) {
 	
@@ -293,6 +316,9 @@ class PHPStoreLocator {
 						isset( $v['db_host'] ) ? $v['db_host'] : null,
 						isset( $v['db_type'] ) ? $v['db_type'] : null
 					);
+					break;
+				case 'db':
+					$this->setDb( $v );
 					break;
 				case 'radius':
 					$this->setRadius( $v );
@@ -333,6 +359,9 @@ class PHPStoreLocator {
 							$this->addRule( $rule['format_string'], $rule['value'] );
 						}
 					}
+					break;
+				case 'return_class':
+					$this->setReturnClass( $v );
 					break;
 			}
 		}
@@ -381,6 +410,19 @@ class PHPStoreLocator {
 		if ( $db_type ) {
 			$this->db_type = $db_type;
 		}
+	}
+
+	/**
+	* Set the DB object
+	*
+	* Alternative to setting the database info with setDbInfo()
+	* You pass an already created PDO object to this function
+	*
+	* @param PDO $db PDO object
+	* @return void
+	*/
+	function setDb( PDO $db ) {
+		$this->db = $db;
 	}
 
 	/**
@@ -468,6 +510,22 @@ class PHPStoreLocator {
 	}
 
 	/**
+	 * Set the class of the returned locations
+	 *
+	 * @param string $return_class class of the returned locations
+	 *
+	 * @return void
+	 */
+	function setReturnClass( $return_class ) {
+		if ( class_exists( $return_class ) ) {
+			$this->return_class = $return_class;
+		}
+		else {
+			trigger_error( 'Invalid class passed to setReturnClass()', E_USER_ERROR );
+		}
+	}
+
+	/**
 	 * Set distance decimals
 	 * 
 	 * @param int $distance_decimals decimal places to round to
@@ -520,7 +578,7 @@ class PHPStoreLocator {
 	 * @throws Exception Exception will have a code of 1 if conection related otherwise 2
 	 */
 	function getLocations() {
-	
+
 		if ( !$this->position instanceof StdClass ) {
 			trigger_error( 'You must set a position with setPosition() before locating', E_USER_ERROR );
 		}
@@ -561,17 +619,19 @@ class PHPStoreLocator {
 			$this->radius
 		);
 
-		try {
-			$driver_options = array( PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES UTF8' );
-			$pdo = new PDO( sprintf( '%s:dbname=%s;host=%s', $this->db_type, $this->db_name, $this->db_host ), $this->db_username, $this->db_password, $driver_options );
-		}
-		catch( PDOException $e ) {
-			throw new Exception( 'Error connecting to the database', self::ERROR_DB_CONNECTION, $e );
+		if ( $this->db === null ) {
+			try {
+				$driver_options = array( PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES UTF8' );
+				$this->db = new PDO( sprintf( '%s:dbname=%s;host=%s', $this->db_type, $this->db_name, $this->db_host ), $this->db_username, $this->db_password, $driver_options );
+			}
+			catch( PDOException $e ) {
+				throw new Exception( 'Error connecting to the database', self::ERROR_DB_CONNECTION, $e );
+			}
 		}
 
 		try {
-			$pdo->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
-			$stmnt = $pdo->prepare( $sql );
+			$this->db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
+			$stmnt = $this->db->prepare( $sql );
 			$stmnt->bindValue( ':lat', $this->position->lat );
 			$stmnt->bindValue( ':lng', $this->position->lng );
 			
@@ -580,7 +640,12 @@ class PHPStoreLocator {
 			}
 			
 			$stmnt->execute();
-			$locations = $stmnt->fetchAll( PDO::FETCH_OBJ );
+			if ( $this->return_class ) {
+				$locations = $stmnt->fetchAll( PDO::FETCH_CLASS, $this->return_class );	
+			}
+			else {
+				$locations = $stmnt->fetchAll( PDO::FETCH_OBJ );
+			}
 			$locations_slice = $this->limit_length ? array_slice( $locations, $this->limit_start, $this->limit_length ) : null;
 			
 			$result_data = array(
@@ -600,8 +665,7 @@ class PHPStoreLocator {
 				$result_data['position'] = $this->position;
 			}
 			
-			$result = (object)$result_data;
-			return $result;
+			return (object)$result_data;
 		}
 		catch ( PDOException $e ) {
 			throw new Exception( $e->getMessage(), self::ERROR_QUERY, $e );
