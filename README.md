@@ -42,13 +42,13 @@ PHP Store Locator API
 		)
 	);
 
-	$locator = new PHPStoreLocator( $options );
+	$locator = new StoreLocator( $options );
 	
 	try {
 		$result = $locator->getLocations();
 	}
 	catch( Exception $e ) {
-		if ( $e->getCode() == PHPStoreLocator::ERROR_DB_CONNECTION ) {
+		if ( $e->getCode() == StoreLocator::ERROR_DB_CONNECTION ) {
 			$error_msg = 'Error Connecting to the database';
 		}
 		else {
