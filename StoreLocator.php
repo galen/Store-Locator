@@ -3,7 +3,7 @@
 /**
  * Store Locator
  * @author Galen Grover <galenjr@gmail.com>
- * @packagePStoreLocator
+ * @package StoreLocator
 */
 
 /**
